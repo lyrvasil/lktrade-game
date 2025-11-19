@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <title>Coffee Cup Run – LK TRADE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #f7f3eb 0%, #d9c6a3 40%, #3b2f2f 100%);
+      color: #1f1a17;
+    }
+
+    .card {
+      background: rgba(247,243,235,0.98);
+      border-radius: 20px;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.18);
+      padding: 20px 18px 24px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .title { font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; color: #2d241e; }
+    .subtitle { font-size: 0.9rem; color: #7a6a58; margin-bottom: 16px; }
+
+    .screen { display: none; margin-top: 6px; }
+    .screen.active { display: block; }
+    .center { text-align: center; }
+
+    .btn {
+      margin-top: 10px;
+      cursor: pointer;
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b2f2f, #7a4b2f);
+      color: #f7f3eb;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(0,0,0,0.3);
+    }
+
+    canvas {
+      width: 100%;
+      border-radius: 12px;
+      margin-top: 10px;
+      background: linear-gradient(to top, #c89c6c 0%, #f7f3eb 55%);
+      border: 1px solid rgba(59,47,47,0.18);
+    }
+
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 0.85rem;
+      color: #7a6a58;
+    }
+
+    .score-highlight {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin: 10px 0;
+      color: #3b2f2f;
+    }
+
+    .small-note {
+      font-size: 0.8rem;
+      color: #7a6a58;
+      margin-top: 4px;
+    }
+
+    .footer {
+      margin-top: 14px;
+      font-size: 0.75rem;
+      color: #9a8771;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1 class="title">Coffee Cup Run ☕</h1>
+    <p class="subtitle">Τρέξε με το ποτηράκι της LK TRADE, μάζεψε κόκκους καφέ και απέφυγε τα εμπόδια!</p>
+
+    <!-- Splash -->
+    <section id="splash-screen" class="screen active center">
+      <p>Ο ήρωας είναι το ποτήρι LK TRADE 🥤👟</p>
+      <p>Πάτα στην οθόνη ή Space για άλμα.</p>
+      <button id="start-btn" class="btn btn-primary">Ξεκίνα</button>
+      <p class="small-note">Το παιχνίδι κρατά περίπου 30 δευτερόλεπτα.</p>
+    </section>
+
+    <!-- Game -->
+    <section id="game-screen" class="screen">
+      <canvas id="game-canvas" width="420" height="220"></canvas>
+      <div class="hud">
+        <span>☕ Κόκκοι: <span id="score">0</span></span>
+        <span>⏱ Χρόνος: <span id="time">30</span>s</span>
+      </div>
+      <p class="small-note">Μάζεψε κόκκους, απέφυγε τα σακιά καφέ!</p>
+    </section>
+
+    <!-- End -->
+    <section id="end-screen" class="screen center">
+      <p id="end-message">Τέλος διαδρομής!</p>
+      <p class="score-highlight">Μάζεψες <span id="final-score">0</span> κόκκους ☕</p>
+      <a href="https://www.lktrade.net/" target="_blank" rel="noopener noreferrer">
+        <button class="btn btn-primary">Δες περισσότερα από την LK TRADE</button>
+      </a>
+      <br>
+      <button id="replay-btn" class="btn">Παίξε ξανά</button>
+      <p class="small-note">Το ποτήρι σου δημιουργήθηκε από την LK TRADE.</p>
+    </section>
+
+    <div class="footer">
+      Mini game για προωθητική χρήση από την <strong>LK TRADE</strong>.
+    </div>
+  </main>
+
+<script>
+const splash = document.getElementById("splash-screen");
+const game = document.getElementById("game-screen");
+const end = document.getElementById("end-screen");
+
+const startBtn = document.getElementById("start-btn");
+const replayBtn = document.getElementById("replay-btn");
+
+const scoreEl = document.getElementById("score");
+const timeEl = document.getElementById("time");
+const finalScoreEl = document.getElementById("final-score");
+const endMessageEl = document.getElementById("end-message");
+
+const canvas = document.getElementById("game-canvas");
+const ctx = canvas.getContext("2d");
+
+let running = false;
+let score = 0;
+let gameTime = 30;
+let lastTime = 0;
+let elapsed = 0;
+let crashed = false;
+
+const groundY = canvas.height - 40;
+
+/* --- sprite ποτηριού με logo --- */
+const cupSprite = new Image();
+let cupSpriteLoaded = false;
+// ΠΡΕΠΕΙ να υπάρχει cup_with_logo.png στον ίδιο φάκελο
+cupSprite.src = "cup_with_logo.png";
+cupSprite.onload = () => { cupSpriteLoaded = true; };
+
+/* AUDIO */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
+  }
+  return audioCtx;
+}
+function playBeep(freq, duration, type = "sine", volume = 0.15) {
+  const ctxA = getAudioCtx();
+  if (!ctxA) return;
+  const osc = ctxA.createOscillator();
+  const gain = ctxA.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.value = volume;
+  osc.connect(gain);
+  gain.connect(ctxA.destination);
+  osc.start();
+  osc.stop(ctxA.currentTime + duration);
+}
+
+/* ΠΟΤΗΡΙ – πιο μικρό και πιο “κοφτό” άλμα */
+const cup = {
+  x: 60,
+  y: 0,
+  width: 55,
+  height: 85,
+  vy: 0,
+  gravity: 1400,   // πιο γρήγορη πτώση
+  jump: -650,      // δυνατό άλμα
+  onGround: true
+};
+
+/* ΚΟΚΚΟΙ ΚΑΦΕ */
+const beans = [];
+let beanTimer = 0;
+const beanInterval = 900;
+
+/* ΕΜΠΟΔΙΑ (ΣΑΚΙΑ) */
+const obstacles = [];
+let obstacleTimer = 0;
+const obstacleInterval = 1900;
+const SAFE_GAP = 300;
+
+function show(screen) {
+  splash.classList.remove("active");
+  game.classList.remove("active");
+  end.classList.remove("active");
+  screen.classList.add("active");
+}
+
+function reset() {
+  running = true;
+  crashed = false;
+  score = 0;
+  gameTime = 30;
+  elapsed = 0;
+  lastTime = 0;
+
+  beans.length = 0;
+  obstacles.length = 0;
+
+  cup.y = groundY - cup.height;
+  cup.vy = 0;
+  cup.onGround = true;
+
+  scoreEl.textContent = "0";
+  timeEl.textContent = "30";
+  endMessageEl.textContent = "Τέλος διαδρομής!";
+
+  beanTimer = 300;
+  obstacleTimer = 700;
+}
+
+/* DRAW */
+function drawBackground() {
+  ctx.fillStyle = "#f7f3eb";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#c89c6c";
+  ctx.fillRect(0, groundY, canvas.width, 50);
+
+  ctx.strokeStyle = "rgba(59,47,47,0.25)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, groundY);
+  ctx.lineTo(canvas.width, groundY);
+  ctx.stroke();
+}
+
+function drawCup() {
+  if (cupSpriteLoaded) {
+    ctx.drawImage(cupSprite, cup.x, cup.y, cup.width, cup.height);
+  } else {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(cup.x, cup.y, cup.width, cup.height);
+  }
+}
+
+function drawBeans() {
+  beans.forEach(b => {
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y, 6, 10, Math.PI / 6, 0, Math.PI * 2);
+    ctx.fillStyle = "#4a2f24";
+    ctx.fill();
+  });
+}
+
+function drawObstacles() {
+  obstacles.forEach(o => {
+    const x = o.x;
+    const y = o.y;
+    const w = o.width;
+    const h = o.height;
+
+    ctx.fillStyle = "#b68a58";
+    ctx.fillRect(x, y, w, h);
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + w / 2, y - 6, x + w, y);
+    ctx.lineTo(x + w, y + 4);
+    ctx.quadraticCurveTo(x + w / 2, y - 2, x, y + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = "#7a4b2f";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+
+    ctx.beginPath();
+    ctx.moveTo(x + 4, y + 6);
+    ctx.lineTo(x + w - 4, y + 6);
+    ctx.stroke();
+
+    ctx.fillStyle = "#7a4b2f";
+    ctx.font = "bold 9px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("C", x + w / 2, y + h / 2);
+  });
+}
+
+/* SPAWN */
+function spawnBean() {
+  const y = groundY - 20 - Math.random() * 90;
+  let x = canvas.width + 40;
+
+  if (obstacles.length > 0) {
+    const lastObs = obstacles[obstacles.length - 1];
+    if (Math.abs(lastObs.x - x) < SAFE_GAP) {
+      x = lastObs.x + SAFE_GAP;
+    }
+  }
+
+  beans.push({ x, y, vx: -200 });
+}
+
+function spawnObstacle() {
+  const width = 36;
+  const height = 34;
+  const y = groundY - height;
+
+  // 1) ΜΗΝ δημιουργείς νέο εμπόδιο αν υπάρχει ήδη κάποιο στην οθόνη
+  //    Έτσι δεν θα έχεις ποτέ "δύο σακιά κολλητά" που είναι αδύνατο να τα περάσεις.
+  let onScreen = 0;
+  for (const o of obstacles) {
+    if (o.x + o.width > 0 && o.x < canvas.width) {
+      onScreen++;
+    }
+  }
+  if (onScreen >= 1) {
+    // Υπάρχει ήδη σακί στο οπτικό πεδίο -> δεν φτιάχνουμε δεύτερο τώρα
+    return;
+  }
+
+  // 2) Θέση spawn αρκετά δεξιά
+  let x = canvas.width + 40;
+
+  // 3) Επιπλέον ασφάλεια: αν υπάρχει πρόσφατος κόκκος, κράτα μια απόσταση
+  if (beans.length > 0) {
+    const lastBean = beans[beans.length - 1];
+    const SAFE_GAP = 260; // αν δεν υπάρχει ήδη πάνω, βάλε εδώ μια φορά
+    if (lastBean.x - x < SAFE_GAP) {
+      x = lastBean.x + SAFE_GAP;
+    }
+  }
+
+  obstacles.push({ x, y, width, height, vx: -200 }); // ή το vx που χρησιμοποιείς
+}
+
+
+/* UPDATE */
+function updateCup(dt) {
+  cup.vy += cup.gravity * dt;
+  cup.y += cup.vy * dt;
+
+  if (cup.y + cup.height >= groundY) {
+    cup.y = groundY - cup.height;
+    cup.vy = 0;
+    cup.onGround = true;
+  }
+}
+
+function updateBeans(dt) {
+  for (let i = beans.length - 1; i >= 0; i--) {
+    const b = beans[i];
+    b.x += b.vx * dt;
+
+    if (
+      b.x > cup.x - 4 &&
+      b.x < cup.x + cup.width + 4 &&
+      b.y > cup.y &&
+      b.y < cup.y + cup.height
+    ) {
+      beans.splice(i, 1);
+      score++;
+      scoreEl.textContent = score.toString();
+      playBeep(880, 0.08, "square", 0.2);
+      continue;
+    }
+
+    if (b.x < -20) beans.splice(i, 1);
+  }
+}
+
+function updateObstacles(dt) {
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    const o = obstacles[i];
+    o.x += o.vx * dt;
+
+    if (
+      o.x < cup.x + cup.width &&
+      o.x + o.width > cup.x &&
+      o.y < cup.y + cup.height &&
+      o.y + o.height > cup.y
+    ) {
+      crashed = true;
+      playBeep(200, 0.2, "sawtooth", 0.25);
+      finish();
+      return;
+    }
+
+    if (o.x < -40) obstacles.splice(i, 1);
+  }
+}
+
+/* GAME LOOP */
+function jump() {
+  if (!running) return;
+  if (cup.onGround) {
+    cup.vy = cup.jump;
+    cup.onGround = false;
+    playBeep(520, 0.08, "sine", 0.15);
+  }
+}
+
+function loop(t) {
+  if (!running) return;
+
+  if (!lastTime) lastTime = t;
+  const dt = (t - lastTime) / 1000;
+  lastTime = t;
+
+  elapsed += dt;
+  gameTime = Math.max(0, 30 - Math.floor(elapsed));
+  timeEl.textContent = gameTime.toString();
+
+  if (gameTime <= 0 && !crashed) {
+    playBeep(660, 0.2, "triangle", 0.22);
+    finish();
+    return;
+  }
+
+  beanTimer += dt * 1000;
+  if (beanTimer > beanInterval) {
+    beanTimer = 0;
+    spawnBean();
+  }
+
+  obstacleTimer += dt * 1000;
+  if (obstacleTimer > obstacleInterval) {
+    obstacleTimer = 0;
+    spawnObstacle();
+  }
+
+  updateCup(dt);
+  updateBeans(dt);
+  updateObstacles(dt);
+
+  drawBackground();
+  drawBeans();
+  drawObstacles();
+  drawCup();
+
+  if (running) requestAnimationFrame(loop);
+}
+
+function finish() {
+  if (!running) return;
+  running = false;
+  finalScoreEl.textContent = score.toString();
+  endMessageEl.textContent = crashed
+    ? "Ωχ! Το ποτήρι LK TRADE έπεσε σε εμπόδιο!"
+    : "Προσπάθησε ξανά!";
+  show(end);
+}
+
+/* EVENTS */
+startBtn.addEventListener("click", () => {
+  const ctxA = getAudioCtx();
+  if (ctxA && ctxA.state === "suspended") ctxA.resume();
+  show(game);
+  reset();
+  requestAnimationFrame(loop);
+});
+
+replayBtn.addEventListener("click", () => {
+  const ctxA = getAudioCtx();
+  if (ctxA && ctxA.state === "suspended") ctxA.resume();
+  show(game);
+  reset();
+  requestAnimationFrame(loop);
+});
+
+canvas.addEventListener("click", jump);
+game.addEventListener("click", (e) => {
+  if (e.target === canvas) return;
+  jump();
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    jump();
+  }
+});
+</script>
+</body>
+</html>
